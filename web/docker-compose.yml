@@ -1,0 +1,85 @@
+# httpsms web — LOCAL DEV stack
+#
+# Just the Nuxt build served by nginx. No database, no Redis, no tunnel: the web
+# UI never talks to anything but the API, and it does that from the visitor's
+# browser over the PUBLIC url — not container-to-container.
+#
+# That is also why there is no depends_on the API here or on the server: the
+# two halves are independent releases, deployed separately, and neither waits
+# for the other.
+#
+# RUNTIME CONFIG, NOT BUILD-TIME. This was the other way round until the image
+# was made configuration-free, and the change is the whole point:
+#
+# `nuxt generate` inlines runtimeConfig.public into the JS, so upstream's web is
+# configured when it is BUILT. That made the dev image and the prod image
+# different artifacts, put this service outside the rule everything else follows,
+# and hid a wrong value until someone opened a browser after a deploy — with
+# nuxt.config falling back to upstream's api.httpsms.com when a value was missing.
+#
+# Now the image is generated with __HTTPSMS_<VAR>__ placeholders (written by the
+# Dockerfile itself) and ops/runtime-config.sh substitutes them at CONTAINER
+# START from the environment below. ONE image runs here and on the server; only
+# these values differ, and they come from this folder's .env exactly like the api.
+#
+# Two consequences worth knowing:
+#   • changing a value needs `up -d --force-recreate`, not `restart` — the
+#     substitution already ran against the container's filesystem;
+#   • web/.env is EXCLUDED from the build context (.dockerignore), so nothing
+#     about this machine can reach the image.
+
+networks:
+  doc_net:
+    external: true
+    name: doc_net
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: httpsms-web:dev
+    container_name: httpsms-web-dev
+    restart: unless-stopped
+    # nginx inside the image listens on 3000, not 80 (web/ nginx conf:
+    # `listen 3000;`).
+    #
+    # DO NOT publish on 127.0.0.1. Docker here is ROOTLESS: a loopback-scoped
+    # publish makes rootlesskit bind the IPv4 loopback ONLY, with no [::1]
+    # listener, so anything resolving `localhost` to ::1 first gets refused.
+    ports:
+      - "${HTTPSMS_WEB_PORT:-58012}:3000"
+    # RUNTIME CONFIG — the image is built with __HTTPSMS_<VAR>__ placeholders and
+    # ops/runtime-config.sh substitutes these at container start. Same image runs
+    # here and on the server; only these values differ. Change one and use
+    # `up -d --force-recreate`, not `restart`: the substitution already ran.
+    environment:
+      API_BASE_URL: ${API_BASE_URL:?API_BASE_URL not set}
+      APP_URL: ${APP_URL:?APP_URL not set}
+      APP_NAME: ${APP_NAME:-httpSMS}
+      APP_ENV: ${APP_ENV:-local}
+      APP_GITHUB_URL: ${APP_GITHUB_URL:-}
+      APP_DOCUMENTATION_URL: ${APP_DOCUMENTATION_URL:-}
+      APP_DOWNLOAD_URL: ${APP_DOWNLOAD_URL:-}
+      CHECKOUT_URL: ${CHECKOUT_URL:-}
+      ENTERPRISE_CHECKOUT_URL: ${ENTERPRISE_CHECKOUT_URL:-}
+      CLOUDFLARE_TURNSTILE_SITE_KEY: ${CLOUDFLARE_TURNSTILE_SITE_KEY:-}
+      PUSHER_KEY: ${PUSHER_KEY:-}
+      PUSHER_CLUSTER: ${PUSHER_CLUSTER:-}
+      FIREBASE_API_KEY: ${FIREBASE_API_KEY:-}
+      FIREBASE_AUTH_DOMAIN: ${FIREBASE_AUTH_DOMAIN:-}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      FIREBASE_STORAGE_BUCKET: ${FIREBASE_STORAGE_BUCKET:-}
+      FIREBASE_MESSAGING_SENDER_ID: ${FIREBASE_MESSAGING_SENDER_ID:-}
+      FIREBASE_APP_ID: ${FIREBASE_APP_ID:-}
+      FIREBASE_MEASUREMENT_ID: ${FIREBASE_MEASUREMENT_ID:-}
+      GITHUB_SHA: ${GITHUB_SHA:-dev}
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - doc_net

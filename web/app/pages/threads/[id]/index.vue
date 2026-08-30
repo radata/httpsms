@@ -246,6 +246,10 @@ async function sendMessage(event: KeyboardEvent | Event) {
 onMounted(async () => {
   await loadData()
 
+  // CUSTOM: see pusherEnabledCustom in ~/composables/useCustom.ts.
+  // onBeforeUnmount already null-checks webhookChannel.
+  if (!pusherEnabledCustom(config.public.pusherKey)) return
+
   const pusher = new Pusher(config.public.pusherKey as string, {
     cluster: config.public.pusherCluster as string,
   })

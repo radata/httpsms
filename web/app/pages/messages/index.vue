@@ -25,7 +25,10 @@ const { formatPhoneNumber } = useFilters()
 
 const sending = ref(false)
 const formPhoneNumber = ref('')
-const phoneCountry = ref('US')
+// CUSTOM: was hardcoded 'US'. See defaultCountryCustom in ~/composables/useCustom.ts.
+const phoneCountry = ref(
+  defaultCountryCustom(useRuntimeConfig().public.defaultCountry),
+)
 const formContent = ref('')
 const formAttachments = ref('')
 const errors = ref(new Map<string, string[]>())

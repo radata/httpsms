@@ -26,7 +26,10 @@ func NewZerologLogger(projectID string, fields map[string]string, driver *zerodr
 		spanContext: span,
 	}
 
-	zerolog.SetGlobalLevel(zerolog.TraceLevel)
+	// CUSTOM: was hardcoded zerolog.TraceLevel, which re-forced Trace on every
+	// construction and overwrote any level set elsewhere. See GlobalLevelCustom
+	// in zerolog_logger_custom.go.
+	zerolog.SetGlobalLevel(GlobalLevelCustom())
 	return logger
 }
 

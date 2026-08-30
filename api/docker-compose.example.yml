@@ -1,0 +1,158 @@
+# httpsms_api — PRODUCTION compose (server)
+#
+# Split from the web UI deliberately, matching wapi / wapi_api / wapi_admin:
+# the two deploy, restart and roll back independently. The API is a Go binary
+# that talks to the database; the web UI is a static Nuxt build served by nginx
+# and only needs the API's PUBLIC url, which is baked in at build time. They
+# have no runtime dependency on each other, so there is no depends_on between
+# these two folders — and there could not be, since they are separate compose
+# projects.
+#
+# THE SERVER IS ON doc_net, so postgres and redis are reached DIRECTLY by
+# container name. No tunnel here, ever. The tunnel exists only for local dev
+# (nodejs/httpsms/docker-compose.override.yml), which is why the dev DATABASE_URL
+# names the local tunnel container and this one names the postgres host directly.
+#
+# postgres and redis
+# are SEPARATE compose projects on this host, so they can
+# never be depends_on targets. The API finds them over doc_net by container name.
+#
+# The image tag is FIXED, not interpolated. ops/deploy.sh loads the versioned
+# image from the release tarball and retags it to this name, so this project
+# needs only .env — `docker compose ps|logs|exec` work here exactly as in every
+# other repo. There is no second env file to remember.
+#
+# Rolling back is a retag; versioned tags stay in the local image store:
+#   docker image ls 'httpsms-*'
+#   docker tag httpsms-<half>:<old-version> <this tag>
+#   docker compose up -d --force-recreate
+
+networks:
+  doc_net:
+    external: true
+    name: doc_net
+
+services:
+  api:
+    image: httpsms-api:current
+    # NEVER PULL. This tag only ever exists locally — ops/deploy.sh creates it by
+    # retagging the image it just loaded from the release tarball. Without this,
+    # a missing tag makes compose try Docker Hub and fail with "pull access
+    # denied ... may require 'docker login'", which reads like a credentials
+    # problem and is actually "deploy.sh did not run, or is the old version that
+    # wrote ops/.release.env instead of retagging".
+    pull_policy: never
+    container_name: httpsms-api
+    restart: unless-stopped
+
+    # DO NOT publish on 127.0.0.1. Docker here is ROOTLESS, and a loopback-scoped
+    # publish makes rootlesskit bind the IPv4 loopback ONLY — there is no [::1]
+    # listener, so anything that dials the name `localhost` and gets ::1 first is
+    # refused. Every reverse_proxy in the host Caddyfile uses `localhost`. A bare
+    # host port gets both 0.0.0.0 and [::], which is what the rest of the fleet
+    # (wapi_api, php, n8n, vaultwarden) publishes and what Caddy can actually reach.
+    ports:
+      - "${HTTPSMS_API_PORT:-58013}:8000"
+
+    # The image entrypoint runs with --dotenv=false: the binary reads its config
+    # from the PROCESS ENVIRONMENT only, it never opens a .env of its own. Docker
+    # is what injects these. They are listed explicitly — the wapi_api pattern —
+    # so the contract is visible here instead of hiding in an unversioned file.
+    # Values interpolate from .env, which deploy.sh passes as --env-file.
+    environment:
+      ENV: ${ENV:-production}
+      # APP_HOST must stay EMPTY: main.go listens on "$APP_HOST:$APP_PORT", so a
+      # value here would bind inside the container and docker could not reach it.
+      APP_HOST: ${APP_HOST:-}
+      APP_PORT: ${APP_PORT:-8000}
+      # NO DEFAULT ON PURPOSE. This key is absent from .env, so under the old
+      # env_file the binary saw "" — any default here would be a silent
+      # behaviour change on the next deploy (it feeds AppName in
+      # pkg/di/container.go:1137, used in outgoing mail). Set it in .env if you
+      # want a real name; do not fix it here.
+      APP_NAME: ${APP_NAME:-}
+      APP_URL: ${APP_URL}
+      SWAGGER_HOST: ${SWAGGER_HOST}
+      USE_HTTP_LOGGER: ${USE_HTTP_LOGGER:-true}
+      ENTITLEMENT_ENABLED: ${ENTITLEMENT_ENABLED:-false}
+
+      # ─── Datastores (reached over doc_net by container name) ──────────────
+      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL_DEDICATED: ${DATABASE_URL_DEDICATED}
+      REDIS_URL: ${REDIS_URL}
+
+      # ─── Events queue ─────────────────────────────────────────────────────
+      EVENTS_QUEUE_TYPE: ${EVENTS_QUEUE_TYPE:-emulator}
+      EVENTS_QUEUE_NAME: ${EVENTS_QUEUE_NAME:-events-local}
+      EVENTS_QUEUE_ENDPOINT: ${EVENTS_QUEUE_ENDPOINT}
+      EVENTS_QUEUE_USER_API_KEY: ${EVENTS_QUEUE_USER_API_KEY}
+      EVENTS_QUEUE_USER_ID: ${EVENTS_QUEUE_USER_ID}
+
+      # ─── Firebase / GCP (push notifications) ──────────────────────────────
+      GCP_PROJECT_ID: ${GCP_PROJECT_ID}
+      FIREBASE_CREDENTIALS: ${FIREBASE_CREDENTIALS}
+
+      # ─── Mail ─────────────────────────────────────────────────────────────
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL}
+
+      # ─── Anti-abuse ───────────────────────────────────────────────────────
+      CLOUDFLARE_TURNSTILE_SECRET_KEY: ${CLOUDFLARE_TURNSTILE_SECRET_KEY}
+
+      # ─── Attachment storage ───────────────────────────────────────────────
+      GCS_BUCKET_NAME: ${GCS_BUCKET_NAME:-}
+
+      # ─── Observability — pick ONE, or neither ─────────────────────────────
+      # The backend is chosen by WHICHEVER CREDENTIAL IS SET, in this order:
+      # AXIOM_TOKEN, then POSTHOG_API_KEY, else no-op. See
+      # pkg/di/container_telemetry_custom.go (CUSTOM: upstream always used
+      # Axiom, which 401-spammed the log every ~5s with no token).
+      #
+      # Uncommenting a line with an EMPTY value in .env changes nothing —
+      # selection tests for a non-empty string, not for presence.
+
+      # Axiom
+      # AXIOM_TOKEN: ${AXIOM_TOKEN}
+      # AXIOM_DATASET_EVENTS: ${AXIOM_DATASET_EVENTS}
+      # AXIOM_DATASET_METRICS: ${AXIOM_DATASET_METRICS}
+
+      # PostHog — PLACEHOLDER. The exporter is not implemented yet: setting
+      # POSTHOG_API_KEY logs one warning at boot and falls back to no-op, so it
+      # is safe to fill in early. POSTHOG_HOST is HOST ONLY, no scheme and no
+      # /v1/traces suffix (otlptracehttp.WithEndpoint wants "host:port"), and
+      # differs between PostHog's EU and US regions.
+      # POSTHOG_API_KEY: ${POSTHOG_API_KEY}
+      # POSTHOG_HOST: ${POSTHOG_HOST}
+
+      # ─── Realtime (Pusher) ────────────────────────────────────────────────
+      # PUSHER_APP_ID: ${PUSHER_APP_ID}
+      # PUSHER_KEY: ${PUSHER_KEY}
+      # PUSHER_SECRET: ${PUSHER_SECRET}
+      # PUSHER_CLUSTER: ${PUSHER_CLUSTER}
+
+      # THIS LIST MUST COVER EVERY KEY IN .env. It does not maintain itself:
+      # a key added to .env and not added here is SILENTLY dropped, and the
+      # binary sees an unset value with no error anywhere. ops/deploy.sh runs
+      # an env-parity gate that refuses to deploy when the two drift — that
+      # gate is the only reason this pattern is safe. Do not remove it.
+
+    # curl is present in the api image (api/Dockerfile, alpine stage).
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    networks:
+      - doc_net

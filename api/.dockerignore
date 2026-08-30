@@ -1,0 +1,14 @@
+# CUSTOM. api/Dockerfile does `COPY . .` with this folder as the build context,
+# so anything here lands in the builder stage. ops/ is ours and must not.
+ops/
+
+# Secrets must never enter an image layer, even one that is later discarded.
+.env
+.env.local
+.env.*.local
+
+# Not inputs to a Go build.
+docker-compose.yml
+docker-compose.example.yml
+docker-compose.override.yml
+*.superseded

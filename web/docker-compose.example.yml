@@ -1,0 +1,113 @@
+# httpsms — PRODUCTION compose (server), web UI only
+#
+# The API is deployed separately. See its compose file for why the two are
+# split and why neither depends_on the other.
+#
+# This container is nginx serving a STATIC Nuxt build, but it is NOT configured
+# at build time — that is the one thing to know about it.
+#
+# `nuxt generate` normally inlines runtimeConfig.public into the JS, which would
+# make the dev image and this image different artifacts and put the web outside
+# the rule everything else here follows. So the image is generated with
+# __HTTPSMS_<VAR>__ placeholders and ops/runtime-config.sh (installed into
+# /docker-entrypoint.d) substitutes them at CONTAINER START from the environment
+# block below. The SAME image runs in dev and here; only this folder's .env
+# differs, exactly like the api.
+#
+# Consequences:
+#   • changing a value is `up -d --force-recreate`, NOT `restart` — the
+#     substitution already ran against the container filesystem;
+#   • the container REFUSES TO START when API_BASE_URL or APP_URL is empty,
+#     because a blank value would send every visitor to the wrong origin and
+#     nothing downstream would report it;
+#   • this .env holds NO secrets. The web needs the Firebase WEB SDK keys and
+#     the Turnstile SITE key, all of which ship to the browser anyway. The
+#     service account, DB and SMTP passwords belong to httpsms_api only.
+#
+# The image tag is FIXED, not interpolated. ops/deploy.sh loads the versioned
+# image from the release tarball and retags it to this name, so this project
+# needs only .env — `docker compose ps|logs|exec` work here exactly as in every
+# other repo. There is no second env file to remember.
+#
+# Rolling back is a retag; versioned tags stay in the local image store:
+#   docker image ls 'httpsms-*'
+#   docker tag httpsms-<half>:<old-version> <this tag>
+#   docker compose up -d --force-recreate
+
+networks:
+  doc_net:
+    external: true
+    name: doc_net
+
+services:
+  web:
+    image: httpsms-web:current
+    # NEVER PULL. This tag only ever exists locally — ops/deploy.sh creates it by
+    # retagging the image it just loaded from the release tarball. Without this,
+    # a missing tag makes compose try Docker Hub and fail with "pull access
+    # denied ... may require 'docker login'", which reads like a credentials
+    # problem and is actually "deploy.sh did not run, or is the old version that
+    # wrote ops/.release.env instead of retagging".
+    pull_policy: never
+    container_name: httpsms-web
+    restart: unless-stopped
+
+    # nginx inside the image listens on 3000, not 80 (web/ nginx conf:
+    # `listen 3000;`).
+    #
+    # DO NOT publish on 127.0.0.1. Docker here is ROOTLESS, and a loopback-scoped
+    # publish makes rootlesskit bind the IPv4 loopback ONLY — no [::1] listener —
+    # so a proxy that dials `localhost` and gets ::1 first is refused. The host
+    # Caddyfile uses `localhost` for every upstream. A bare host port gets both
+    # 0.0.0.0 and [::], matching the rest of the fleet.
+    ports:
+      - "${HTTPSMS_WEB_PORT:-58012}:3000"
+
+    # RUNTIME CONFIG — the image is configuration-free. It is generated with
+    # __HTTPSMS_<VAR>__ placeholders and ops/runtime-config.sh substitutes these
+    # at container start, so the SAME image runs in dev and here; only these
+    # values differ, and they come from this folder's .env like the api's do.
+    #
+    # Changing one needs `up -d --force-recreate`, not `restart`: the
+    # substitution already ran against the container filesystem.
+    #
+    # The container REFUSES TO START when API_BASE_URL or APP_URL is empty —
+    # a blank value would send every visitor's browser to the wrong origin, and
+    # nothing downstream would report it.
+    environment:
+      API_BASE_URL: ${API_BASE_URL:?API_BASE_URL not set}
+      APP_URL: ${APP_URL:?APP_URL not set}
+      APP_NAME: ${APP_NAME:-httpSMS}
+      APP_ENV: ${APP_ENV:-production}
+      APP_GITHUB_URL: ${APP_GITHUB_URL:-}
+      APP_DOCUMENTATION_URL: ${APP_DOCUMENTATION_URL:-}
+      APP_DOWNLOAD_URL: ${APP_DOWNLOAD_URL:-}
+      CHECKOUT_URL: ${CHECKOUT_URL:-}
+      ENTERPRISE_CHECKOUT_URL: ${ENTERPRISE_CHECKOUT_URL:-}
+      CLOUDFLARE_TURNSTILE_SITE_KEY: ${CLOUDFLARE_TURNSTILE_SITE_KEY:-}
+      PUSHER_KEY: ${PUSHER_KEY:-}
+      PUSHER_CLUSTER: ${PUSHER_CLUSTER:-}
+      FIREBASE_API_KEY: ${FIREBASE_API_KEY:-}
+      FIREBASE_AUTH_DOMAIN: ${FIREBASE_AUTH_DOMAIN:-}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      FIREBASE_STORAGE_BUCKET: ${FIREBASE_STORAGE_BUCKET:-}
+      FIREBASE_MESSAGING_SENDER_ID: ${FIREBASE_MESSAGING_SENDER_ID:-}
+      FIREBASE_APP_ID: ${FIREBASE_APP_ID:-}
+      FIREBASE_MEASUREMENT_ID: ${FIREBASE_MEASUREMENT_ID:-}
+      GITHUB_SHA: ${HTTPSMS_VERSION:-unknown}
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    networks:
+      - doc_net

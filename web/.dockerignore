@@ -1,0 +1,30 @@
+# CUSTOM. web/Dockerfile does `COPY . .` with this folder as the build context.
+ops/
+# ...except the container-start config script, which the production stage
+# installs into /docker-entrypoint.d. It is the only thing in ops/ that belongs
+# in an image; everything else there drives builds from the host.
+!ops/runtime-config.sh
+
+# EXCLUDE every host .env. The image is built with __HTTPSMS_<VAR>__ placeholders
+# that the Dockerfile writes itself, and ops/runtime-config.sh substitutes real
+# values at container start — so the build needs no configuration and must not
+# pick any up.
+#
+# Excluding these is what makes the guarantee hold: nothing about this machine
+# can reach the image, one artifact runs in dev and production, and a symlinked
+# .env can no longer arrive dangling and silently bake upstream's
+# api.httpsms.com into the bundle.
+.env
+.env.*
+
+# Reinstalled inside the image; copying the host tree in is slow and can drag
+# glibc-built binaries into an alpine build.
+node_modules/
+.output/
+.nuxt/
+
+# Not inputs to the build.
+docker-compose.yml
+docker-compose.example.yml
+docker-compose.override.yml
+*.superseded

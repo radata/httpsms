@@ -58,10 +58,16 @@ const dialogTitle = computed(() =>
   props.contact ? 'Edit Contact' : 'Add Contact',
 )
 
+// CUSTOM: was hardcoded 'US'. See defaultCountryCustom in ~/composables/useCustom.ts.
+// Read at setup scope because phoneNumberRow also runs from event handlers.
+const defaultCountry = defaultCountryCustom(
+  useRuntimeConfig().public.defaultCountry,
+)
+
 function phoneNumberRow(value = ''): PhoneNumberRow {
   return {
     value,
-    country: parsePhoneNumberFromString(value)?.country ?? 'US',
+    country: parsePhoneNumberFromString(value)?.country ?? defaultCountry,
   }
 }
 
@@ -327,8 +333,8 @@ watch(
           </VBtn>
         </div>
         <div
-          v-for="(email, index) in form.emails"
-          :key="`email-${email}-${index}`"
+          v-for="(_email, index) in form.emails"
+          :key="`email-${index}`"
           class="d-flex align-start ga-2"
         >
           <VTextField

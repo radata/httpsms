@@ -225,8 +225,11 @@ func (repository *gormUserRepository) LoadOrStore(ctx context.Context, authUser 
 		Email:            authUser.Email,
 		APIKey:           "uk_" + apiKey,
 		SubscriptionName: entities.SubscriptionNameFree,
-		CreatedAt:        time.Now().UTC(),
-		UpdatedAt:        time.Now().UTC(),
+		// CUSTOM: was left unset, which fell through to the column default
+		// `Africa/Accra` on entities.User. See gorm_user_repository_custom.go.
+		Timezone:  defaultTimezoneCustom(),
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
 	}
 
 	isNew := false

@@ -13,7 +13,17 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.httpsms"
+        // CUSTOM: was "com.httpsms" (upstream's). This MUST equal a
+        // package_name in app/google-services.json or the google-services gradle
+        // plugin fails the build with "No matching client found for package
+        // name". The Firebase app registered for this deployment is
+        // nl.hollandworx.sms.
+        //
+        // Only applicationId changes. `namespace` below stays com.httpsms: that
+        // one is the package for the generated R and BuildConfig classes and has
+        // to match the Kotlin source tree (com/httpsms/...), which Firebase does
+        // not care about. Android supports the two differing.
+        applicationId = "nl.hollandworx.sms"
         minSdk = 28
         targetSdk = 37
         versionCode = 1

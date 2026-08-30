@@ -285,13 +285,13 @@ onBeforeUnmount(() => {
               <a
                 class="text-decoration-none hover:text-decoration-underline"
                 target="_blank"
-                href="https://api.httpsms.com"
+                :href="config.public.apiBaseUrl"
                 >httpSMS API</a
               >, use the API key under your account settings page instead
               <NuxtLink
                 class="text-decoration-none hover:text-decoration-underline"
                 to="/settings"
-                >https://httpsms.com/settings</NuxtLink
+                >{{ config.public.appUrl }}/settings</NuxtLink
               >.
             </p>
             <VTable class="mb-4 api-key-table" density="comfortable">

@@ -880,7 +880,7 @@ onMounted(async () => {
             <p class="text-medium-emphasis">
               Use your API Key in the <v-code>x-api-key</v-code> HTTP Header
               when sending requests to
-              <v-code>https://api.httpsms.com</v-code> endpoints.
+              <v-code>{{ config.public.apiBaseUrl }}</v-code> endpoints.
             </p>
             <div v-if="apiKey === ''" class="mb-n9 pl-3 pt-5">
               <VProgressCircular

@@ -1,11 +1,34 @@
 .idea
-.env*
-!.env.docker
-!.env.production
 *serviceAccountKey.json
 android/app/debug/
 *main.exe*
 android/app/release/
+
+# Kernel core dumps (created on crash, can be hundreds of MB)
+core
+core.[0-9]*
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+
+# local env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production
+.env.production.local
 
 tests/firebase-credentials.json
 tests/emulator/emulator.exe
@@ -16,3 +39,36 @@ SECURITY_AUDIT_REPORT.md
 .output
 .agents/
 skills-lock.json
+
+/logs
+/external_services
+
+# --- CUSTOM (radata fork): deployment tooling ---------------------------------
+# THIS REPO IS PUBLIC (fork of NdoleStudio/httpsms). Nothing describing how or
+# where we deploy belongs in it.
+#
+# ops/ is NOT tracked: the build and deploy scripts name the bastion host, the
+# ssh port, the login user, the server paths and the release layout. They live
+# only on disk and on the deploy host. Release tarballs under ops/tmp/ are also
+# ~50MB each, which is reason enough on its own.
+**/ops/
+# files parked during the api/web split
+*.superseded
+# The real api dev stack: names the bastion host, ssh port, login user and the
+# private key path. api/docker-compose.example.yml is the sanitised template
+# that ships instead.
+api/docker-compose.yml
+# Our Firebase config: project id, app id, oauth client and the Android API
+# key. Upstream TRACKS this file, so it was inherited tracked and .gitignore
+# alone could never have held it back — it needed git rm --cached, which is
+# why it reached GitHub twice. Keep it local; the build fails loudly without
+# it and ops/build-release.sh already gates on it.
+android/app/google-services.json
+
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts

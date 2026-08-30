@@ -1894,8 +1894,13 @@ func (container *Container) UserRistrettoCache() *ristretto.Cache[string, entiti
 }
 
 // InitializeTraceProvider initializes the open telemetry trace provider
+//
+// CUSTOM: upstream calls initializeAxiomTraceProvider unconditionally, which
+// 401-spams the log every batch when AXIOM_TOKEN is empty. The backend choice
+// now lives in container_telemetry_custom.go — keep this delegation one line so
+// upstream merges stay trivial.
 func (container *Container) InitializeTraceProvider() func() {
-	return container.initializeAxiomTraceProvider(container.version, container.projectID)
+	return container.initializeTraceProviderCustom(container.version, container.projectID)
 }
 
 func (container *Container) initializeGoogleTraceProvider(version string, namespace string) func() {
@@ -2026,11 +2031,12 @@ func logger(skipFrameCount int) telemetry.Logger {
 	)
 }
 
+// CUSTOM: delegated to logDriverCustom in container_telemetry_custom.go.
+// Upstream sends every non-local deployment to axiomLogger, which log.Fatal()s
+// when AXIOM_TOKEN is absent — so a self-hosted production API could not boot at
+// all. Keep this one line so upstream merges stay trivial.
 func logDriver(skipFrameCount int) *zerodriver.Logger {
-	if isLocal() {
-		return consoleLogger(skipFrameCount)
-	}
-	return axiomLogger(skipFrameCount)
+	return logDriverCustom(skipFrameCount)
 }
 
 func axiomLogger(skipFrameCount int) *zerodriver.Logger {

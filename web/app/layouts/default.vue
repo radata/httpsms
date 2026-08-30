@@ -15,21 +15,28 @@ const appStore = useAppStore()
 let poller: ReturnType<typeof setInterval> | null = null
 let canPoll = false
 
+// CUSTOM: see pusherEnabledCustom in ~/composables/useCustom.ts
+const pusherEnabled = pusherEnabledCustom(config.public.pusherKey)
+
 const hasDrawer = computed(() => {
   return ['threads', 'threads-id'].includes((route.name as string) ?? '')
 })
 
 onMounted(() => {
   setTimeout(() => {
-    const pusher = new Pusher(config.public.pusherKey as string, {
-      cluster: config.public.pusherCluster as string,
-    })
-
-    if (authStore.authUser) {
-      const channel = pusher.subscribe(authStore.authUser.id)
-      channel.bind('phone.updated', () => {
-        canPoll = true
+    if (pusherEnabled) {
+      const pusher = new Pusher(config.public.pusherKey as string, {
+        cluster: config.public.pusherCluster as string,
       })
+
+      if (authStore.authUser) {
+        const channel = pusher.subscribe(authStore.authUser.id)
+        channel.bind('phone.updated', () => {
+          canPoll = true
+        })
+      }
+    } else {
+      canPoll = true
     }
 
     startPoller()
@@ -58,7 +65,9 @@ function startPoller() {
       ])
     }
 
-    canPoll = false
+    // Re-arm the latch only when Pusher can actually trip it again. With no
+    // Pusher this stays true so the next tick polls.
+    canPoll = !pusherEnabled
     setTimeout(() => appStore.setPolling(false), 1000)
   }, 10_000)
 }

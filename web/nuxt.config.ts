@@ -129,6 +129,9 @@ export default defineNuxtConfig({
         process.env.CLOUDFLARE_TURNSTILE_SITE_KEY || '',
       pusherKey: process.env.PUSHER_KEY || '',
       pusherCluster: process.env.PUSHER_CLUSTER || '',
+      // CUSTOM: default country for phone-number entry. Upstream hardcoded 'US'
+      // in ContactDialog and the send form. See ~/composables/useCustom.ts.
+      defaultCountry: process.env.DEFAULT_COUNTRY || 'US',
       firebaseApiKey: process.env.FIREBASE_API_KEY || '',
       firebaseAuthDomain: process.env.FIREBASE_AUTH_DOMAIN || '',
       firebaseProjectId: process.env.FIREBASE_PROJECT_ID || '',
