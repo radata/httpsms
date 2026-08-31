@@ -1,5 +1,8 @@
 package com.httpsms
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -91,6 +94,15 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             .Builder(SendSmsWorker::class.java)
             .setConstraints(constraints)
             .setInputData(inputData)
+            // The api pushes this notification with Android priority "high"
+            // (pkg/services/phone_notification_service.go), which grants the app a
+            // temporary Doze allowlist window. A plain OneTimeWorkRequest does not
+            // use that window: in Doze it is parked until the next maintenance
+            // window, observed here at 1-2 hours, while the server expires the
+            // message after phones.message_expiration_seconds (600 by default).
+            // The send then never happens and the message expires untouched, with
+            // last_attempted_at still NULL.
+            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
             .addTag(messageID)
             .build()
 
@@ -132,6 +144,41 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     }
 
     internal class SendSmsWorker(appContext: Context, workerParams: WorkerParameters) : Worker(appContext, workerParams) {
+        // Required by setExpedited(). On API 31+ expedited work runs as an
+        // expedited job and this is never called; on API 28-30 (minSdk is 28)
+        // WorkManager runs it as a foreground service and THROWS
+        // IllegalStateException if the worker does not supply ForegroundInfo.
+        // Reuses StickyNotificationService's channel — createNotificationChannel
+        // is idempotent for an existing id, so this is safe whether or not the
+        // sticky service happens to be running.
+        override fun getForegroundInfo(): ForegroundInfo {
+            val channelId = "sticky_notification_channel"
+
+            val notificationManager = applicationContext
+                .getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(
+                NotificationChannel(
+                    channelId,
+                    channelId,
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    enableVibration(false)
+                    setShowBadge(false)
+                }
+            )
+
+            val notification = Notification.Builder(applicationContext, channelId)
+                .setContentTitle("httpSMS")
+                .setContentText("Sending SMS message")
+                .setSmallIcon(R.drawable.ic_stat_name)
+                .setOngoing(true)
+                .build()
+
+            // Notification id 2: StickyNotificationService owns id 1 and must not
+            // be displaced while this runs.
+            return ForegroundInfo(2, notification)
+        }
+
         override fun doWork(): Result {
             if (!Settings.isLoggedIn(applicationContext)) {
                 Timber.w("user is not logged in, stopping processing")
