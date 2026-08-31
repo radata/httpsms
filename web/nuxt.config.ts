@@ -131,7 +131,7 @@ export default defineNuxtConfig({
       pusherCluster: process.env.PUSHER_CLUSTER || '',
       // CUSTOM: default country for phone-number entry. Upstream hardcoded 'US'
       // in ContactDialog and the send form. See ~/composables/useCustom.ts.
-      defaultCountry: process.env.DEFAULT_COUNTRY || 'US',
+      defaultCountry: process.env.DEFAULT_COUNTRY || 'NL',
       // CUSTOM: whether plan limits and upgrade paths exist at all. Kept as a
       // RAW STRING and parsed in the app, never `=== 'true'` here — at build
       // time this holds the literal __HTTPSMS_ENTITLEMENT_ENABLED__ placeholder,

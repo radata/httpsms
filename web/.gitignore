@@ -9,6 +9,19 @@ dist
 # Node dependencies
 node_modules
 
+# pnpm's local content-addressable store. Created when pnpm runs with this
+# directory as its store root — which is what happens when the dev server is
+# run in a container that bind-mounts web/ (see the debugging procedure: the
+# compose `web` service is the final nginx stage and cannot run pnpm). Hundreds
+# of MB of package tarballs; never belongs in the repo.
+.pnpm-store
+
+# TypeScript incremental build cache. The root .gitignore already lists
+# *.tsbuildinfo, but this file was committed before that rule existed and so
+# stayed tracked — .gitignore never applies to files git already follows.
+# Untracked with `git rm --cached web/tsconfig.tsbuildinfo`.
+*.tsbuildinfo
+
 # Logs
 logs
 *.log

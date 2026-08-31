@@ -50,18 +50,26 @@ const emit = defineEmits<{
 }>()
 
 const contactsStore = useContactsStore()
+
+// CUSTOM: was hardcoded 'US'. See defaultCountryCustom in ~/composables/useCustom.ts.
+// Read at setup scope because phoneNumberRow also runs from event handlers.
+//
+// MUST STAY ABOVE `form`. That initialiser calls emptyForm() -> phoneNumberRow(),
+// which reads defaultCountry. Both are hoisted function declarations so the call
+// itself works, but a `const` declared below is still in its temporal dead zone,
+// and setup dies with "Cannot access 'defaultCountry' before initialization".
+// In a production build that surfaces as a bare 500 naming a minified variable,
+// on every route that mounts this dialog — including /threads/[id].
+const defaultCountry = defaultCountryCustom(
+  useRuntimeConfig().public.defaultCountry,
+)
+
 const saving = ref(false)
 const form = ref<ContactForm>(emptyForm())
 const formErrors = ref(new ErrorMessages())
 
 const dialogTitle = computed(() =>
   props.contact ? 'Edit Contact' : 'Add Contact',
-)
-
-// CUSTOM: was hardcoded 'US'. See defaultCountryCustom in ~/composables/useCustom.ts.
-// Read at setup scope because phoneNumberRow also runs from event handlers.
-const defaultCountry = defaultCountryCustom(
-  useRuntimeConfig().public.defaultCountry,
 )
 
 function phoneNumberRow(value = ''): PhoneNumberRow {
