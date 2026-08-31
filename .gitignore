@@ -65,6 +65,12 @@ api/docker-compose.yml
 # it and ops/build-release.sh already gates on it.
 android/app/google-services.json
 
+# Working notes — investigation write-ups, open questions, things parked for
+# later. Local thinking, not documentation, and it names this deployment's hosts
+# and Firebase project in passing. It reached a commit once (1d1757f, reset
+# before it was pushed); this is what stops the next one.
+__to_do/
+
 
 # vercel
 .vercel

@@ -5,7 +5,6 @@ import {
   mdiCircle,
   mdiTwitter,
   mdiHeart,
-  mdiShieldStar,
   mdiLightbulbOn50,
   mdiCreation,
   mdiEyeOffOutline,
@@ -200,15 +199,6 @@ function goToPricing() {
                 >
                   Pricing
                   <v-icon size="small" :icon="mdiCreditCardOutline" />
-                </a>
-              </li>
-              <li class="mb-2">
-                <a
-                  href="https://httpsms.lemonsqueezy.com/affiliates"
-                  class="text-white text-decoration-none footer-link"
-                >
-                  Affiliates
-                  <v-icon color="warning" size="small" :icon="mdiShieldStar" />
                 </a>
               </li>
               <li class="mb-2">

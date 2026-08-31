@@ -23,17 +23,21 @@ type BillingService struct {
 	cache                  cache.Cache
 	emailFactory           emails.UserEmailFactory
 	mailer                 emails.Mailer
+	entitlementEnabled     bool
 	userRepository         repositories.UserRepository
 	billingUsageRepository repositories.BillingUsageRepository
 }
 
-// NewBillingService creates a new BillingService
+// NewBillingService creates a new BillingService.
+// The entitlementEnabled flag should come from the ENTITLEMENT_ENABLED
+// environment variable, the same one that drives the EntitlementService.
 func NewBillingService(
 	logger telemetry.Logger,
 	tracer telemetry.Tracer,
 	cache cache.Cache,
 	mailer emails.Mailer,
 	emailFactory emails.UserEmailFactory,
+	entitlementEnabled bool,
 	usageRepository repositories.BillingUsageRepository,
 	userRepository repositories.UserRepository,
 ) (s *BillingService) {
@@ -43,6 +47,7 @@ func NewBillingService(
 		cache:                  cache,
 		emailFactory:           emailFactory,
 		mailer:                 mailer,
+		entitlementEnabled:     entitlementEnabled,
 		userRepository:         userRepository,
 		billingUsageRepository: usageRepository,
 	}
@@ -52,6 +57,15 @@ func NewBillingService(
 func (service *BillingService) IsEntitledWithCount(ctx context.Context, userID entities.UserID, count uint) *string {
 	ctx, span, ctxLogger := service.tracer.StartWithLogger(ctx, service.logger)
 	defer span.End()
+
+	// CUSTOM: a self-hosted install that sells nothing has no plan to exceed.
+	// Upstream enforces SubscriptionName.Limit() unconditionally, so every user
+	// stops at 200 messages a month even when ENTITLEMENT_ENABLED is false and
+	// there is no checkout to upgrade through. Usage is still recorded below by
+	// RegisterSentMessage/RegisterReceivedMessage — only the ceiling is gone.
+	if !service.entitlementEnabled {
+		return nil
+	}
 
 	user, err := service.userRepository.Load(ctx, userID)
 	if err != nil {
@@ -181,6 +195,14 @@ func (service *BillingService) DeleteAllForUser(ctx context.Context, userID enti
 func (service *BillingService) sendUsageAlert(ctx context.Context, userID entities.UserID) {
 	ctx, span, ctxLogger := service.tracer.StartWithLogger(ctx, service.logger)
 	defer span.End()
+
+	// CUSTOM: no ceiling means nothing to warn about — "you have used 160 of
+	// your 200 messages" is a lie when the 200 is never enforced. Returning here
+	// rather than in shouldSendAlert also drops the two loads this does on every
+	// single sent and received message.
+	if !service.entitlementEnabled {
+		return
+	}
 
 	user, err := service.userRepository.Load(ctx, userID)
 	if err != nil {

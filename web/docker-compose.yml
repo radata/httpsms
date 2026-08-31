@@ -63,6 +63,10 @@ services:
       APP_DOWNLOAD_URL: ${APP_DOWNLOAD_URL:-}
       CHECKOUT_URL: ${CHECKOUT_URL:-}
       ENTERPRISE_CHECKOUT_URL: ${ENTERPRISE_CHECKOUT_URL:-}
+      # Must match ENTITLEMENT_ENABLED in the api's .env. The api decides
+      # whether messages are capped; this only decides whether the UI shows a
+      # cap and an upgrade path. Default off — same as the api.
+      ENTITLEMENT_ENABLED: ${ENTITLEMENT_ENABLED:-false}
       CLOUDFLARE_TURNSTILE_SITE_KEY: ${CLOUDFLARE_TURNSTILE_SITE_KEY:-}
       PUSHER_KEY: ${PUSHER_KEY:-}
       PUSHER_CLUSTER: ${PUSHER_CLUSTER:-}

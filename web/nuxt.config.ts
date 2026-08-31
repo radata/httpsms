@@ -132,6 +132,16 @@ export default defineNuxtConfig({
       // CUSTOM: default country for phone-number entry. Upstream hardcoded 'US'
       // in ContactDialog and the send form. See ~/composables/useCustom.ts.
       defaultCountry: process.env.DEFAULT_COUNTRY || 'US',
+      // CUSTOM: whether plan limits and upgrade paths exist at all. Kept as a
+      // RAW STRING and parsed in the app, never `=== 'true'` here — at build
+      // time this holds the literal __HTTPSMS_ENTITLEMENT_ENABLED__ placeholder,
+      // so comparing here would bake `false` in and no runtime substitution
+      // could ever change it. See ~/composables/useCustom.ts.
+      //
+      // MUST MATCH ENTITLEMENT_ENABLED in the api's .env: the api decides
+      // whether messages are actually capped, this only decides whether the UI
+      // says so.
+      entitlementEnabled: process.env.ENTITLEMENT_ENABLED || '',
       firebaseApiKey: process.env.FIREBASE_API_KEY || '',
       firebaseAuthDomain: process.env.FIREBASE_AUTH_DOMAIN || '',
       firebaseProjectId: process.env.FIREBASE_PROJECT_ID || '',

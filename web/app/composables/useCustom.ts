@@ -52,3 +52,23 @@ export function defaultCountryCustom(value: unknown): string {
     .toUpperCase()
   return /^[A-Z]{2}$/.test(country) ? country : 'US'
 }
+
+/**
+ * Whether this install sells plans at all.
+ *
+ * Upstream's billing page always shows `<used>/200 messages`, an Upgrade Plan
+ * button and the Pro/Enterprise cards, because httpsms.com always has a Lemon
+ * Squeezy store behind it. A self-hosted install that charges nobody has
+ * neither, and showing them is worse than noise: the checkout URLs shipped in
+ * .env.production point at NdoleStudio's OWN store, so a user who clicks
+ * Upgrade pays upstream for a plan this server will never see.
+ *
+ * Parsed exactly like the api parses ENTITLEMENT_ENABLED (`== "true"`, see
+ * pkg/di/container.go), so the same value in both .env files means the same
+ * thing on both sides. Anything else — unset, empty, "1", the unsubstituted
+ * placeholder — is off, which is the safe direction: no ceiling is claimed that
+ * the api would not enforce.
+ */
+export function entitlementEnabledCustom(value: unknown): boolean {
+  return String(value ?? '').trim() === 'true'
+}

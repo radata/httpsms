@@ -131,6 +131,18 @@ const subscriptionIsCancelled = computed(
   () => authStore.user?.subscription_status === 'cancelled',
 )
 
+// CUSTOM: does this install sell plans at all? Off hides every ceiling and every
+// upgrade path — see ~/composables/useCustom.ts for why that matters.
+const entitlementEnabled = entitlementEnabledCustom(
+  config.public.entitlementEnabled,
+)
+
+// CUSTOM: "FREE" only means something next to a paid tier. With entitlements off
+// there is no tier and no cap, so name it for what it is.
+const planLabel = computed(() =>
+  !entitlementEnabled && isOnFreePlan.value ? 'Unlimited' : plan.value.name,
+)
+
 const invoiceStateOptions = computed(() =>
   getStateOptions(invoiceFormCountry.value),
 )
@@ -144,6 +156,10 @@ const totalMessages = computed(() => {
 })
 
 const checkoutURL = computed(() => {
+  // CUSTOM: `new URL('')` THROWS, and an unconfigured self-hosted install has no
+  // CHECKOUT_URL. Upstream never hit this because httpsms.com always sets one;
+  // here it took the whole billing page down with it.
+  if (!config.public.checkoutUrl) return undefined
   const url = new URL(config.public.checkoutUrl as string)
   const user = authStore.authUser
   if (user) {
@@ -159,6 +175,8 @@ const checkoutURL = computed(() => {
 })
 
 const enterpriseCheckoutURL = computed(() => {
+  // CUSTOM: same as checkoutURL above — empty is a valid configuration here.
+  if (!config.public.enterpriseCheckoutUrl) return undefined
   const url = new URL(config.public.enterpriseCheckoutUrl as string)
   const user = authStore.authUser
   if (user) {
@@ -288,7 +306,8 @@ onMounted(async () => {
                     <h1
                       class="text-title-large mt-0 mb-0 font-weight-bold text-uppercase"
                     >
-                      <span v-if="isOnFreePlan">{{ plan.name }}</span>
+                      <!-- CUSTOM: planLabel, not plan.name — see script. -->
+                      <span v-if="isOnFreePlan">{{ planLabel }}</span>
                       <span v-else-if="subscriptionIsCancelled">
                         <span class="text-warning">{{ plan.name }}</span> → Free
                       </span>
@@ -324,11 +343,21 @@ onMounted(async () => {
                         ).toLocaleDateString()
                       }}</b>
                     </p>
-                    <p v-else class="text-medium-emphasis mt-1">
+                    <!-- CUSTOM: the denominator is only true while the api
+                         enforces it (ENTITLEMENT_ENABLED). Otherwise show the
+                         usage on its own rather than a cap nobody hits. -->
+                    <p
+                      v-else-if="entitlementEnabled"
+                      class="text-medium-emphasis mt-1"
+                    >
                       {{ formatDecimal(totalMessages) }}/{{
                         formatDecimal(plan.messagesPerMonth)
                       }}
                       messages
+                    </p>
+                    <p v-else class="text-medium-emphasis mt-1">
+                      {{ formatDecimal(totalMessages) }} messages this billing
+                      period
                     </p>
                   </div>
                   <div class="d-flex mb-1 mt-1">
@@ -344,8 +373,10 @@ onMounted(async () => {
                     >
                       Update Plan
                     </VBtn>
+                    <!-- CUSTOM: nothing to upgrade to when this install sells
+                         nothing; the href would be upstream's own store. -->
                     <VBtn
-                      v-else-if="!isOnLifetimePlan"
+                      v-else-if="!isOnLifetimePlan && entitlementEnabled"
                       color="primary"
                       :href="checkoutURL"
                     >
@@ -413,7 +444,8 @@ onMounted(async () => {
             </VRow>
 
             <!-- Upgrade Plan (only for free users) -->
-            <template v-if="isOnFreePlan">
+            <!-- CUSTOM: ...and only when this install actually sells plans. -->
+            <template v-if="isOnFreePlan && entitlementEnabled">
               <h2 class="text-headline-large mt-4 mb-2">Upgrade Plan</h2>
               <VRow>
                 <VCol cols="12" md="6">

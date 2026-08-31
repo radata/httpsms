@@ -984,6 +984,9 @@ func (container *Container) BillingService() (service *services.BillingService) 
 		container.InMemoryCache(),
 		container.Mailer(),
 		container.UserEmailFactory(),
+		// CUSTOM: same switch as EntitlementService() below — off means no
+		// monthly message ceiling and no "approaching your limit" mail.
+		os.Getenv("ENTITLEMENT_ENABLED") == "true",
 		container.BillingUsageRepository(),
 		container.UserRepository(),
 	)
