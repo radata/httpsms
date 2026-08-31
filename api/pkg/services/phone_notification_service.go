@@ -147,7 +147,39 @@ func (service *PhoneNotificationService) Send(ctx context.Context, params *Phone
 			"KEY_MESSAGE_ID": params.MessageID.String(),
 		},
 		Android: &messaging.AndroidConfig{
-			Priority: "normal",
+			// CUSTOM: "high", not upstream's "normal".
+			//
+			// NORMAL-PRIORITY FCM IS NOT DELIVERED DURING DOZE. It is held by
+			// Play Services until the next maintenance window, which in deep
+			// Doze are 1h, 2h, 4h, then 6h apart. The phone is never told there
+			// is a message, so it never attempts one.
+			//
+			// This is NOT fixable on the Android side. onMessageReceived is not
+			// called, so no amount of expedited WorkManager, foreground service
+			// or inline sending helps — the push has not arrived yet.
+			//
+			// The battery allowlist does not rescue it either: that exempts the
+			// app from App Standby and Doze's job/network limits, but the FCM
+			// deferral happens in Play Services BEFORE the app is involved.
+			// Measured on an allowlisted, fully-permissioned device held in
+			// forced deep Doze: two messages sat at status=scheduled with
+			// last_attempted_at=null and were never attempted at all.
+			//
+			// It shows up in ordinary use too, as wildly variable latency on the
+			// same device — 1s, 47s, 92s, 10m, 53m — and as messages reaching
+			// max_send_attempts and expiring unsent.
+			//
+			// High priority is the documented, intended mechanism for exactly
+			// this: it wakes the device and grants a brief network window. Each
+			// push here corresponds to one user-initiated send, which is the
+			// time-sensitive/user-visible case Firebase asks for, so this is not
+			// at risk of the throttling that punishes apps using high priority
+			// for background chatter.
+			//
+			// The heartbeat above has always been "high", which is why the phone
+			// looks online and healthy while sends stall — the monitoring path
+			// was the one path never affected.
+			Priority: "high",
 			TTL:      &ttl,
 		},
 		Token: *phone.FcmToken,
