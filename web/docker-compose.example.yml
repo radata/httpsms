@@ -63,6 +63,26 @@ services:
     ports:
       - "${HTTPSMS_WEB_PORT:-58012}:3000"
 
+    # CUSTOM: the published Android apk, served at /downloads/HttpSms.apk (see
+    # nginx.conf). Mounted, not baked in, for the same reason the config is
+    # substituted at start: one image everywhere, and a new app build must not
+    # require rebuilding and redeploying the web.
+    #
+    # THE ANDROID REPO IS NOT ON THIS HOST. The apk is built on a workstation
+    # (android/ops/build-release.sh writes android/ops/public/) and copied up:
+    #
+    #   scp android/ops/public/HttpSms.apk* <server>:<this dir>/downloads/
+    #
+    # No redeploy is needed afterwards — nginx serves the file straight off the
+    # mount, and Cache-Control: no-store means the next visitor gets the new
+    # build rather than a remembered old one.
+    #
+    # An absent or empty directory is not an error here: /downloads/ answers 404
+    # (nginx.conf makes sure of that rather than serving the SPA as an apk) and
+    # the rest of the site is unaffected.
+    volumes:
+      - ${APK_DIR:-./downloads}:/usr/share/nginx/html/downloads:ro
+
     # RUNTIME CONFIG — the image is configuration-free. It is generated with
     # __HTTPSMS_<VAR>__ placeholders and ops/runtime-config.sh substitutes these
     # at container start, so the SAME image runs in dev and here; only these
@@ -84,6 +104,10 @@ services:
       APP_DOWNLOAD_URL: ${APP_DOWNLOAD_URL:-}
       CHECKOUT_URL: ${CHECKOUT_URL:-}
       ENTERPRISE_CHECKOUT_URL: ${ENTERPRISE_CHECKOUT_URL:-}
+      # Must match ENTITLEMENT_ENABLED in the api's .env. The api decides whether
+      # messages are capped; this only decides whether the UI shows a cap and an
+      # upgrade path. Default off — same as the api.
+      ENTITLEMENT_ENABLED: ${ENTITLEMENT_ENABLED:-false}
       CLOUDFLARE_TURNSTILE_SITE_KEY: ${CLOUDFLARE_TURNSTILE_SITE_KEY:-}
       PUSHER_KEY: ${PUSHER_KEY:-}
       PUSHER_CLUSTER: ${PUSHER_CLUSTER:-}

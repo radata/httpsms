@@ -49,6 +49,20 @@ services:
     # listener, so anything resolving `localhost` to ::1 first gets refused.
     ports:
       - "${HTTPSMS_WEB_PORT:-58012}:3000"
+    # CUSTOM: the published Android apk, served at /downloads/HttpSms.apk (see
+    # nginx.conf). Mounted rather than baked in, for the same reason the config
+    # is: the image stays one artifact, and a new app build does not drag a web
+    # rebuild and redeploy behind it.
+    #
+    # The source is android/ops/public — the directory android/ops/build-release.sh
+    # publishes into, whose entire contents are meant to be public. It is
+    # deliberately NOT android/ops/tmp: that holds ~50MB release tarballs from
+    # every past build, and none of them belong on the internet.
+    #
+    # read-only, and it is worth keeping that way. Nothing in the web container
+    # has any business writing to a directory on the build host.
+    volumes:
+      - ${APK_DIR:-../android/ops/public}:/usr/share/nginx/html/downloads:ro
     # RUNTIME CONFIG — the image is built with __HTTPSMS_<VAR>__ placeholders and
     # ops/runtime-config.sh substitutes these at container start. Same image runs
     # here and on the server; only these values differ. Change one and use
