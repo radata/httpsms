@@ -86,17 +86,39 @@ func (validator *PhoneHandlerValidator) ValidateUpsert(ctx context.Context, user
 			},
 			"message_expiration_seconds": []string{
 				"min:60",
-				"max:3600",
+				"max:7200",
 			},
 			"message_send_schedule_id": []string{
 				"uuid",
+			},
+		},
+		// govalidator's defaults name the raw JSON key and phrase a numeric bound
+		// as "must be maximum 7200 in size", which says neither what the unit is
+		// nor what a sane value looks like. Each message below states the limit and
+		// what it means, because the limit is the one thing the person needs.
+		//
+		// Written as bare PREDICATES, no field name: the client prefixes the field
+		// (see getApiErrorDetails in web/app/utils/api-error.ts), so a message that
+		// names itself gets read twice.
+		Messages: govalidator.MapData{
+			"messages_per_minute": []string{
+				"min:cannot be negative.",
+				"max:must be 60 or less — the gateway phone sends at most one SMS per second.",
+			},
+			"max_send_attempts": []string{
+				"min:cannot be negative.",
+				"max:must be 5 or less.",
+			},
+			"message_expiration_seconds": []string{
+				"min:must be at least 60 (1 minute).",
+				"max:must be at most 7200 (2 hours).",
 			},
 		},
 	})
 
 	result := v.ValidateStruct()
 	if request.MaxSendAttempts > 0 && request.MessageExpirationSeconds == 0 {
-		result.Add("message_expiration_seconds", "message_expiration_seconds cannot be 0 when max_send_attempts is greater than 0")
+		result.Add("message_expiration_seconds", "cannot be 0 when max send attempts is greater than 0 — a retry needs a window to retry inside.")
 	}
 
 	if len(result) > 0 {

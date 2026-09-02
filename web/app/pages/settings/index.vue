@@ -1643,6 +1643,15 @@ onMounted(async () => {
                   type="number"
                   density="compact"
                   label="Message Expiration (seconds)"
+                  min="60"
+                  max="7200"
+                  hint="How long a message may sit unsent before it counts as expired. 60–7200 seconds (1 minute to 2 hours)."
+                  persistent-hint
+                  :rules="[
+                    (v: number) =>
+                      (v >= 60 && v <= 7200) ||
+                      'Message expiration must be between 60 and 7200 seconds (1 minute to 2 hours)',
+                  ]"
                 />
                 <VTextField
                   v-model="activePhone.messages_per_minute"
@@ -1650,6 +1659,15 @@ onMounted(async () => {
                   type="number"
                   density="compact"
                   label="Messages Per Minute"
+                  min="0"
+                  max="60"
+                  hint="Sending rate for this SIM. 0–60 (the gateway phone sends at most one SMS per second)."
+                  persistent-hint
+                  :rules="[
+                    (v: number) =>
+                      (v >= 0 && v <= 60) ||
+                      'Messages per minute must be between 0 and 60',
+                  ]"
                 />
                 <VTextField
                   v-model="activePhone.max_send_attempts"
