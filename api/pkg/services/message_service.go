@@ -929,6 +929,25 @@ func (service *MessageService) CheckExpired(ctx context.Context, params MessageC
 		return nil
 	}
 
+	// CUSTOM: status "sending" means the phone fetched the message after the
+	// push, which is the last delivery signal the api can rely on — the SENT
+	// report from the phone's radio is not guaranteed to arrive. Expiring it
+	// here would trigger a retry that sends the SMS a second time, so treat
+	// the fetch as the send. Only a message the phone never fetched (push
+	// lost) expires and is retried. A late FAILED event still overrides this.
+	if message.IsSending() {
+		sentAt := time.Now().UTC()
+		if message.LastAttemptedAt != nil {
+			sentAt = *message.LastAttemptedAt
+		}
+
+		ctxLogger.Info(fmt.Sprintf("message [%s] was fetched by the phone at [%s] without a SENT event, marking it as sent instead of expiring it", message.ID, sentAt))
+		if err = service.handleMessageSentEvent(ctx, MessageStoreEventParams{Source: params.Source, Timestamp: sentAt}, message); err != nil {
+			return service.tracer.WrapErrorSpan(span, stacktrace.Propagatef(err, "cannot mark fetched message [%s] as sent", message.ID))
+		}
+		return nil
+	}
+
 	event, err := service.createMessageSendExpiredEvent(params.Source, events.MessageSendExpiredPayload{
 		MessageID:        message.ID,
 		Owner:            message.Owner,
