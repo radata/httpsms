@@ -40,7 +40,8 @@ services:
       dockerfile: Dockerfile
     image: httpsms-web:dev
     container_name: httpsms-web-dev
-    restart: unless-stopped
+    mem_limit: 1g
+    # restart: unless-stopped
     # nginx inside the image listens on 3000, not 80 (web/ nginx conf:
     # `listen 3000;`).
     #
