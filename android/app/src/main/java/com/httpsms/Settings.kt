@@ -20,6 +20,7 @@ object Settings {
     private const val SETTINGS_SIM2_INCOMING_CALL_ACTIVE = "SETTINGS_SIM2_INCOMING_CALL_ACTIVE"
     private const val SETTINGS_DEBUG_LOG_ENABLED = "SETTINGS_DEBUG_LOG_ENABLED"
     private const val SETTINGS_API_KEY = "SETTINGS_API_KEY"
+    private const val SETTINGS_DATA_DISCLOSURE_ACCEPTED = "SETTINGS_DATA_DISCLOSURE_ACCEPTED"
     private const val SETTINGS_SERVER_URL = "SETTINGS_SERVER_URL"
     private const val SETTINGS_FCM_TOKEN = "SETTINGS_FCM_TOKEN"
     private const val SETTINGS_USER_ID = "SETTINGS_USER_ID"
@@ -121,6 +122,24 @@ object Settings {
 
         Timber.d("SETTINGS_${sim}_INCOMING_ACTIVE: [$activeStatus]")
         return activeStatus
+    }
+
+    // Google Play's Prominent Disclosure Requirement: the user must be told
+    // in-app, before the system permission dialog, what SMS and call data is
+    // collected and that it leaves the device. Persisted so the disclosure is
+    // shown once rather than on every launch; a decline is deliberately NOT
+    // persisted, so the app asks again next time instead of silently giving up.
+    fun hasAcceptedDataDisclosure(context: Context): Boolean {
+        return PreferenceManager
+            .getDefaultSharedPreferences(context)
+            .getBoolean(this.SETTINGS_DATA_DISCLOSURE_ACCEPTED, false)
+    }
+
+    fun setDataDisclosureAccepted(context: Context, accepted: Boolean) {
+        PreferenceManager.getDefaultSharedPreferences(context)
+            .edit()
+            .putBoolean(this.SETTINGS_DATA_DISCLOSURE_ACCEPTED, accepted)
+            .apply()
     }
 
     fun isIncomingCallEventsEnabled(context: Context, sim: String): Boolean {

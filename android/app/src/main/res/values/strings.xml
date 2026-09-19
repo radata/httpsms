@@ -34,4 +34,9 @@
     <string name="enable_debug_logs">Enable debug logs</string>
     <string name="enable_incoming_call_events_sim1">Enable SIM1 missed call events</string>
     <string name="enable_sim2_incoming_call_events">Enable SIM2 missed call events</string>
+
+    <string name="disclosure_title">How httpSMS uses your messages</string>
+    <string name="disclosure_message">httpSMS relays text messages between this phone and the server you configure.\n\nTo do that it needs access to SMS and call information on this device:\n\n\u2022 Text messages (SMS and MMS) received on this phone are forwarded to your server.\n\u2022 Messages you send from your server are sent out through this phone\'s SIM.\n\u2022 Missed call events are forwarded to your server, if you enable that in Settings.\n\nThis data is sent off this device to the server address you enter when you sign in. It is not sent anywhere else and is not shared with any third party.\n\nAndroid will now ask you to grant these permissions. You can revoke them at any time in Android Settings.</string>
+    <string name="disclosure_continue">Continue</string>
+    <string name="disclosure_decline">Not now</string>
 </resources>

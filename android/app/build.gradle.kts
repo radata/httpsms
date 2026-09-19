@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("com.google.gms.google-services")
@@ -5,9 +7,24 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-val gitHash = providers.exec {
-    commandLine("git", "rev-parse", "--short", "HEAD")
-}.standardOutput.asText.map { it.trim() }
+// Release signing credentials. They live outside git, in one of two places:
+// keystore.properties beside this module (see .gitignore) on a machine that
+// keeps the password on disk, or the HW_SMS_* environment variables on one
+// that keeps it in a password manager. The file wins where both exist.
+val keystoreProps = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+
+fun signingProp(key: String, env: String): String? =
+    keystoreProps.getProperty(key) ?: System.getenv(env)
+
+// App version, hand-bumped in version.properties. Kept out of this file so the
+// number sits somewhere obvious rather than buried in a build script, and so a
+// version bump is a one-line diff that reviews cleanly.
+val appVersion = Properties().apply {
+    rootProject.file("version.properties").inputStream().use { load(it) }
+}.getProperty("versionCode").trim().toInt()
 
 android {
     compileSdk = 37
@@ -26,9 +43,30 @@ android {
         applicationId = "nl.hollandworx.sms"
         minSdk = 28
         targetSdk = 37
-        versionCode = 1
-        versionName = gitHash.getOrElse("unknown")
+        // One number for both. Play permanently rejects a re-used or lower
+        // versionCode, so bump version.properties before every upload.
+        versionCode = appVersion
+        versionName = appVersion.toString()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    // WHY THIS TOLERATES MISSING CREDENTIALS. A checkout without the keystore
+    // (a fresh clone, CI running unit tests) still has to configure. So an
+    // absent storeFile leaves the config half-built here and unreferenced
+    // below, and assembleRelease then emits an UNSIGNED apk exactly as it did
+    // before this block existed — the failure ops/build-release.sh:50-51
+    // documents. Failing the build instead would break `test` on every machine
+    // that has no business holding the signing key.
+    signingConfigs {
+        create("release") {
+            val store = signingProp("storeFile", "HW_SMS_STORE_FILE")
+            if (store != null) {
+                storeFile = file(store)
+                storePassword = signingProp("storePassword", "HW_SMS_STORE_PASSWORD")
+                keyAlias = signingProp("keyAlias", "HW_SMS_KEY_ALIAS")
+                keyPassword = signingProp("keyPassword", "HW_SMS_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
@@ -37,6 +75,9 @@ android {
         }
         getByName("release") {
             manifestPlaceholders["sentryEnvironment"] = "production"
+            // null when no credentials were found, which is what makes the
+            // unsigned-but-still-configurable case above work.
+            signingConfig = signingConfigs.getByName("release").takeIf { it.storeFile != null }
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }

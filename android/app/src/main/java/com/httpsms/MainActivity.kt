@@ -15,6 +15,7 @@ import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -80,7 +81,35 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        requestPermissions(this)
+        // The system permission dialog does not satisfy Play's Prominent
+        // Disclosure Requirement on its own, and neither does a privacy policy:
+        // the app itself has to say what SMS and call data it collects and that
+        // the data leaves the device, BEFORE the permission request. So the
+        // request is gated behind this acknowledgement rather than fired here.
+        if (Settings.hasAcceptedDataDisclosure(this)) {
+            requestPermissions(this)
+        } else {
+            showDataDisclosure(this)
+        }
+    }
+
+    private fun showDataDisclosure(context: Context) {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.disclosure_title)
+            .setMessage(R.string.disclosure_message)
+            // Not cancelable: a disclosure dismissed by a stray tap outside the
+            // dialog would not be the affirmative acknowledgement Play requires.
+            .setCancelable(false)
+            .setPositiveButton(R.string.disclosure_continue) { dialog, _ ->
+                Settings.setDataDisclosureAccepted(context, true)
+                dialog.dismiss()
+                requestPermissions(context)
+            }
+            .setNegativeButton(R.string.disclosure_decline) { dialog, _ ->
+                Timber.w("data disclosure declined, not requesting SMS permissions")
+                dialog.dismiss()
+            }
+            .show()
     }
 
     override fun onResume() {

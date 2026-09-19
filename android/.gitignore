@@ -14,3 +14,9 @@
 .cxx
 .kotlin/sessions/
 local.properties
+
+# Release signing. keystore.properties holds the keystore password in the
+# clear and *.jks is the signing key itself — neither ever goes to git.
+/keystore.properties
+*.jks
+*.keystore
