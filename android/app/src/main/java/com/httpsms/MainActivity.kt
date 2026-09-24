@@ -103,7 +103,13 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton(R.string.disclosure_continue) { dialog, _ ->
                 Settings.setDataDisclosureAccepted(context, true)
                 dialog.dismiss()
-                requestPermissions(context)
+                // NOT requestPermissions() here. It calls registerForActivityResult,
+                // which Android only allows before the activity is STARTED; a button
+                // tap happens while RESUMED, so it threw IllegalStateException and
+                // crashed the app on "Continue". recreate() goes back through
+                // onStart, which now sees the acceptance and requests from there —
+                // the same path that already worked after a manual restart.
+                recreate()
             }
             .setNegativeButton(R.string.disclosure_decline) { dialog, _ ->
                 Timber.w("data disclosure declined, not requesting SMS permissions")
