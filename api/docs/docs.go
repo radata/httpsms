@@ -2420,7 +2420,7 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Updates properties of a user's phone. If the phone with this number does not exist, a new one will be created. Think of this method like an 'upsert'",
+                "description": "Updates properties of a user's phone. If the phone with this number does not exist, a new one will be created. Think of this method like an 'upsert'. URL-backed phone gateways receive FCM-compatible HTTP wake-ups.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2483,7 +2483,7 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Updates the FCM token of a phone. If the phone with this number does not exist, a new one will be created. Think of this method like an 'upsert'",
+                "description": "Updates the FCM token or adapter callback URL of a phone. If the phone with this number does not exist, a new one will be created. Think of this method like an 'upsert'. URL-backed phone gateways receive FCM-compatible HTTP wake-ups.",
                 "consumes": [
                     "application/json"
                 ],
@@ -4129,12 +4129,12 @@ const docTemplate = `{
                 "created_at",
                 "id",
                 "is_archived",
-                "is_read",
                 "last_message_content",
                 "last_message_id",
                 "order_timestamp",
                 "owner",
                 "status",
+                "unread_count",
                 "updated_at",
                 "user_id"
             ],
@@ -4167,10 +4167,6 @@ const docTemplate = `{
                     "type": "boolean",
                     "example": false
                 },
-                "is_read": {
-                    "type": "boolean",
-                    "example": true
-                },
                 "last_message_content": {
                     "type": "string",
                     "example": "This is a sample message content"
@@ -4190,6 +4186,10 @@ const docTemplate = `{
                 "status": {
                     "type": "string",
                     "example": "PENDING"
+                },
+                "unread_count": {
+                    "type": "integer",
+                    "example": 0
                 },
                 "updated_at": {
                     "type": "string",
@@ -4920,9 +4920,9 @@ const docTemplate = `{
                     "type": "boolean",
                     "example": true
                 },
-                "is_read": {
-                    "type": "boolean",
-                    "example": true
+                "unread_count": {
+                    "type": "integer",
+                    "example": 0
                 }
             }
         },
@@ -4947,6 +4947,7 @@ const docTemplate = `{
             ],
             "properties": {
                 "fcm_token": {
+                    "description": "FcmToken is either a Firebase registration token or a public HTTPS adapter callback URL.",
                     "type": "string",
                     "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzd....."
                 },
@@ -4975,6 +4976,7 @@ const docTemplate = `{
             ],
             "properties": {
                 "fcm_token": {
+                    "description": "FcmToken is either a Firebase registration token or a public HTTPS adapter callback URL.",
                     "type": "string",
                     "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzd....."
                 },

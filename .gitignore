@@ -31,6 +31,7 @@ yarn-error.log*
 .env.production.local
 
 tests/firebase-credentials.json
+tests/certs/
 tests/emulator/emulator.exe
 SECURITY_AUDIT_REPORT.md
 
@@ -78,3 +79,7 @@ __to_do/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# upstream
+.worktrees/
+docs/superpowers

@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -26,13 +27,31 @@ const (
 	apiBaseURL         = "http://localhost:8000"
 	wiremockURL        = "http://localhost:8080"
 	wiremockWebhookURL = "http://wiremock.local:8080" // reachable from API container, passes URL validation (needs a dot)
+	adapterControlURL  = "http://localhost:9092"
 	userAPIKey         = "test-user-api-key"
+	systemAPIKey       = "system-user-api-key"
 )
 
 type testPhone struct {
 	PhoneNumber string
 	PhoneAPIKey string
 	FcmToken    string
+}
+
+type adapterTestPhone struct {
+	testPhone
+	PhoneID   string
+	GatewayID string
+}
+
+type notificationRecord struct {
+	GatewayID     string            `json:"gateway_id"`
+	Data          map[string]string `json:"data"`
+	MessageID     string            `json:"message_id,omitempty"`
+	Kind          string            `json:"kind"`
+	Processed     bool              `json:"processed"`
+	Error         string            `json:"error,omitempty"`
+	Authorization string            `json:"authorization,omitempty"`
 }
 
 func newAPIClient() *httpsms.Client {
@@ -117,6 +136,237 @@ func setupPhone(ctx context.Context, t *testing.T, messagesPerMinute uint) testP
 		PhoneAPIKey: phoneAPIKeyValue,
 		FcmToken:    fcmToken,
 	}
+}
+
+func setupAdapterPhone(ctx context.Context, t *testing.T, messagesPerMinute uint) adapterTestPhone {
+	t.Helper()
+
+	gatewayID := uuid.NewString()
+	phoneNumber := randomPhoneNumber()
+	client := newAPIClient()
+
+	apiKeyResponse, response, err := client.PhoneAPIKeys.Store(ctx, &httpsms.PhoneAPIKeyStoreParams{
+		Name: "adapter-test-key-" + uuid.NewString(),
+	})
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, response.HTTPResponse.StatusCode, "phone api key store failed")
+
+	phoneAPIKey := apiKeyResponse.Data.APIKey
+	require.NotEmpty(t, phoneAPIKey)
+
+	// Upsert the phone first so its ID is known before the adapter emulator is registered:
+	// the API signs notification requests with a JWT keyed by the phone ID, and the emulator
+	// needs that ID up front to validate the JWT on every notification it receives.
+	callbackURL := fmt.Sprintf("https://adapter-emulator:9091/notifications/%s", gatewayID)
+	phoneResponse, response, err := client.Phones.Upsert(ctx, &httpsms.PhoneUpsertParams{
+		PhoneNumber:              phoneNumber,
+		FcmToken:                 callbackURL,
+		MessagesPerMinute:        messagesPerMinute,
+		MaxSendAttempts:          2,
+		MessageExpirationSeconds: 600,
+		SIM:                      "SIM1",
+	})
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, response.HTTPResponse.StatusCode, "phone upsert failed")
+	require.NotEmpty(t, phoneResponse.Data.ID)
+
+	registrationBody, err := json.Marshal(map[string]any{
+		"phone_number":  phoneNumber,
+		"phone_api_key": phoneAPIKey,
+		"phone_id":      phoneResponse.Data.ID,
+	})
+	require.NoError(t, err)
+	registrationRequest, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPut,
+		fmt.Sprintf("%s/test/gateways/%s", adapterControlURL, gatewayID),
+		bytes.NewReader(registrationBody),
+	)
+	require.NoError(t, err)
+	registrationRequest.Header.Set("Content-Type", "application/json")
+	registrationResponse, err := http.DefaultClient.Do(registrationRequest)
+	require.NoError(t, err)
+	registrationResponseBody, err := io.ReadAll(registrationResponse.Body)
+	registrationResponse.Body.Close()
+	require.NoError(t, err)
+	require.Equal(
+		t,
+		http.StatusNoContent,
+		registrationResponse.StatusCode,
+		"adapter gateway registration failed: %s",
+		string(registrationResponseBody),
+	)
+
+	phoneClient := newPhoneClient(phoneAPIKey)
+	_, response, err = phoneClient.Phones.UpsertFCMToken(ctx, &httpsms.PhoneFCMTokenParams{
+		PhoneNumber: phoneNumber,
+		FcmToken:    callbackURL,
+		SIM:         "SIM1",
+	})
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, response.HTTPResponse.StatusCode, "adapter callback bind failed")
+
+	waitForPhoneAuthorization(ctx, t, phoneAPIKey, phoneNumber, 20*time.Second)
+
+	return adapterTestPhone{
+		testPhone: testPhone{
+			PhoneNumber: phoneNumber,
+			PhoneAPIKey: phoneAPIKey,
+			FcmToken:    callbackURL,
+		},
+		PhoneID:   phoneResponse.Data.ID,
+		GatewayID: gatewayID,
+	}
+}
+
+func dispatchInternalEvent(ctx context.Context, t *testing.T, event map[string]any) {
+	t.Helper()
+
+	body, err := json.Marshal(event)
+	require.NoError(t, err)
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, apiBaseURL+"/v1/events", bytes.NewReader(body))
+	require.NoError(t, err)
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("x-api-key", systemAPIKey)
+
+	response, err := http.DefaultClient.Do(request)
+	require.NoError(t, err)
+	defer response.Body.Close()
+
+	responseBody, err := io.ReadAll(response.Body)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusNoContent, response.StatusCode, "event dispatch failed: %s", string(responseBody))
+}
+
+func waitForAdapterMessageRecords(
+	t *testing.T,
+	gatewayID string,
+	messageID string,
+	timeout time.Duration,
+) []notificationRecord {
+	t.Helper()
+
+	deadline := time.Now().Add(timeout)
+	var records []notificationRecord
+	var lastErr error
+	for time.Now().Before(deadline) {
+		records, lastErr = fetchAdapterNotificationRecords(gatewayID, messageID)
+		if lastErr == nil && len(records) > 0 && adapterRecordsProcessed(records) {
+			return records
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	require.NoError(t, lastErr)
+	require.NotEmpty(t, records, "adapter message record for %s was not available within %v", messageID, timeout)
+	require.True(t, adapterRecordsProcessed(records), "adapter message records were not processed: %#v", records)
+	return records
+}
+
+func waitForAdapterHeartbeatRecord(
+	t *testing.T,
+	gatewayID string,
+	timeout time.Duration,
+) notificationRecord {
+	t.Helper()
+
+	deadline := time.Now().Add(timeout)
+	var lastErr error
+	for time.Now().Before(deadline) {
+		records, err := fetchAdapterNotificationRecords(gatewayID, "")
+		lastErr = err
+		if err == nil {
+			for _, record := range records {
+				if record.Kind == "heartbeat" && record.Processed {
+					return record
+				}
+			}
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	require.NoError(t, lastErr)
+	t.Fatalf("processed adapter heartbeat record was not available within %v", timeout)
+	return notificationRecord{}
+}
+
+func triggerAdapterIncoming(
+	ctx context.Context,
+	t *testing.T,
+	phone adapterTestPhone,
+	contact string,
+	content string,
+) string {
+	t.Helper()
+
+	body, err := json.Marshal(map[string]any{
+		"contact":   contact,
+		"content":   content,
+		"encrypted": false,
+	})
+	require.NoError(t, err)
+	request, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		fmt.Sprintf("%s/test/gateways/%s/incoming", adapterControlURL, phone.GatewayID),
+		bytes.NewReader(body),
+	)
+	require.NoError(t, err)
+	request.Header.Set("Content-Type", "application/json")
+
+	response, err := http.DefaultClient.Do(request)
+	require.NoError(t, err)
+	defer response.Body.Close()
+	responseBody, err := io.ReadAll(response.Body)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, response.StatusCode, "adapter incoming trigger failed: %s", string(responseBody))
+
+	var result struct {
+		Data struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(responseBody, &result))
+	require.NotEmpty(t, result.Data.ID)
+	return result.Data.ID
+}
+
+func fetchAdapterNotificationRecords(gatewayID string, messageID string) ([]notificationRecord, error) {
+	endpoint := fmt.Sprintf("%s/test/gateways/%s/notifications", adapterControlURL, gatewayID)
+	if messageID != "" {
+		endpoint += "?message_id=" + url.QueryEscape(messageID)
+	}
+
+	response, err := (&http.Client{Timeout: 5 * time.Second}).Get(endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("fetch adapter notification records: %w", err)
+	}
+	defer response.Body.Close()
+
+	responseBody, err := io.ReadAll(response.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read adapter notification records: %w", err)
+	}
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("fetch adapter notification records: status %d: %s", response.StatusCode, string(responseBody))
+	}
+
+	var result struct {
+		Data []notificationRecord `json:"data"`
+	}
+	if err := json.Unmarshal(responseBody, &result); err != nil {
+		return nil, fmt.Errorf("decode adapter notification records: %w", err)
+	}
+	return result.Data, nil
+}
+
+func adapterRecordsProcessed(records []notificationRecord) bool {
+	for _, record := range records {
+		if !record.Processed {
+			return false
+		}
+	}
+	return true
 }
 
 func waitForPhoneAuthorization(
@@ -325,6 +575,39 @@ func assertWebhookJWT(t *testing.T, request wmJournal.Request, signingKey string
 	require.True(t, ok, "cannot parse claims")
 	require.Equal(t, "api.httpsms.com", claims["iss"], "issuer mismatch")
 	require.NotEmpty(t, claims["sub"], "subject mismatch")
+
+	exp, err := claims.GetExpirationTime()
+	require.NoError(t, err)
+	require.True(t, exp.After(time.Now()), "token is expired")
+
+	nbf, err := claims.GetNotBefore()
+	require.NoError(t, err)
+	require.True(t, nbf.Before(time.Now()), "token not yet valid")
+}
+
+// assertAdapterNotificationJWT validates the JWT the API signs adapter notification requests
+// with, using the receiving phone's ID as the HMAC-SHA256 secret (see
+// api/pkg/services/http_notification_sender.go getAuthToken). The phone ID is only used as the
+// secret and is never embedded in a claim, so this only checks the signature and issuer, not a
+// subject; the adapter emulator itself rejects notifications with an invalid signature (401).
+func assertAdapterNotificationJWT(t *testing.T, record notificationRecord, phoneID string) {
+	t.Helper()
+
+	require.NotEmpty(t, record.Authorization, "adapter notification record missing Authorization header")
+	require.True(t, strings.HasPrefix(record.Authorization, "Bearer "), "Authorization header must start with Bearer")
+
+	tokenString := strings.TrimPrefix(record.Authorization, "Bearer ")
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		require.Equal(t, jwt.SigningMethodHS256, token.Method, "unexpected signing method")
+		return []byte(phoneID), nil
+	})
+	require.NoError(t, err, "JWT validation failed")
+	require.True(t, token.Valid, "JWT token is not valid")
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	require.True(t, ok, "cannot parse claims")
+	require.Equal(t, "api.httpsms.com", claims["iss"], "issuer mismatch")
+	require.Empty(t, claims["sub"], "phone ID must not be embedded in a claim since it is also the signing secret")
 
 	exp, err := claims.GetExpirationTime()
 	require.NoError(t, err)
