@@ -55,7 +55,7 @@ services:
     # is: the image stays one artifact, and a new app build does not drag a web
     # rebuild and redeploy behind it.
     #
-    # The source is android/ops/public — the directory android/ops/build-release.sh
+    # The source is android/ops/public — the directory android/scripts/build-release.sh
     # publishes into, whose entire contents are meant to be public. It is
     # deliberately NOT android/ops/tmp: that holds ~50MB release tarballs from
     # every past build, and none of them belong on the internet.

@@ -54,9 +54,9 @@ android {
     // (a fresh clone, CI running unit tests) still has to configure. So an
     // absent storeFile leaves the config half-built here and unreferenced
     // below, and assembleRelease then emits an UNSIGNED apk exactly as it did
-    // before this block existed — the failure ops/build-release.sh:50-51
-    // documents. Failing the build instead would break `test` on every machine
-    // that has no business holding the signing key.
+    // before this block existed — the case scripts/build-release.sh refuses
+    // for --release and --bundle. Failing the build instead would break `test`
+    // on every machine that has no business holding the signing key.
     signingConfigs {
         create("release") {
             val store = signingProp("storeFile", "HW_SMS_STORE_FILE")

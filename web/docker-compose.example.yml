@@ -69,7 +69,7 @@ services:
     # require rebuilding and redeploying the web.
     #
     # THE ANDROID REPO IS NOT ON THIS HOST. The apk is built on a workstation
-    # (android/ops/build-release.sh writes android/ops/public/) and copied up:
+    # (android/scripts/build-release.sh writes android/ops/public/) and copied up:
     #
     #   scp android/ops/public/HttpSms.apk* <server>:<this dir>/downloads/
     #

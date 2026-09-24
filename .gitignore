@@ -63,7 +63,7 @@ api/docker-compose.yml
 # key. Upstream TRACKS this file, so it was inherited tracked and .gitignore
 # alone could never have held it back — it needed git rm --cached, which is
 # why it reached GitHub twice. Keep it local; the build fails loudly without
-# it and ops/build-release.sh already gates on it.
+# it and android/scripts/build-release.sh already gates on it.
 android/app/google-services.json
 
 # Working notes — investigation write-ups, open questions, things parked for
