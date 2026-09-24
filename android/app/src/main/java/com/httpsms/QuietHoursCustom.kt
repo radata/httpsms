@@ -37,6 +37,11 @@ import java.util.concurrent.TimeUnit
 //   - After every successful heartbeat the app re-reads the windows from
 //     GET /v1/phones/quiet-hours (refresh), so a schedule edited on the server
 //     reaches the phone on its next heartbeat inside a window.
+//   - The server's heartbeat push also triggers a refresh. That push only comes
+//     when the server thinks the phone is awake, so receiving it while our copy
+//     says quiet means our copy is stale (quiet hours shortened overnight).
+//     Without this the server would re-probe every 16 minutes until our old
+//     window opened. The radio is already up for the reply, so it costs nothing.
 //
 // No cached schedule, or one with no windows, means never quiet — upstream
 // behaviour.

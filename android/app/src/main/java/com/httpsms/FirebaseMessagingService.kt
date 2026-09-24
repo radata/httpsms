@@ -76,6 +76,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
 
                 HttpSmsApiService.create(applicationContext).storeHeartbeat(phoneNumbers.toTypedArray(), Settings.isCharging(applicationContext))
                 Settings.setHeartbeatTimestampAsync(applicationContext, System.currentTimeMillis())
+                QuietHoursCustom.refresh(applicationContext) // CUSTOM: server probed us, so our windows may be stale — see QuietHoursCustom.kt
             } catch (exception: Exception) {
                 Timber.e(exception)
             }
