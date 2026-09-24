@@ -19,6 +19,7 @@ import androidx.work.workDataOf
 import com.httpsms.Constants
 import com.httpsms.HttpSmsApiService
 import com.httpsms.Settings
+import com.httpsms.quietDelayCustom
 import timber.log.Timber
 import java.time.Instant
 import java.time.ZoneOffset
@@ -77,6 +78,7 @@ class PhoneStateReceiver : BroadcastReceiver() {
 
         val work = OneTimeWorkRequest
             .Builder(MissedCallWorker::class.java)
+            .quietDelayCustom(context, owner) // CUSTOM: see QuietHoursCustom.kt
             .setConstraints(constraints)
             .setInputData(inputData)
             .build()

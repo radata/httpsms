@@ -92,6 +92,11 @@ func (service *PhoneNotificationService) SendHeartbeatFCM(ctx context.Context, p
 		return service.tracer.WrapErrorSpan(span, stacktrace.NewErrorf("phone with id [%s] has no notification token", phone.ID))
 	}
 
+	// CUSTOM: this push wakes the radio — never during quiet hours. See quiet_hours_custom.go.
+	if quietNowCustom(ctx, phone) {
+		return nil
+	}
+
 	result, _, err := service.sendPhoneNotification(ctx, phone, &messaging.Message{
 		Data: map[string]string{
 			"KEY_HEARTBEAT_ID": time.Now().UTC().Format(time.RFC3339),
@@ -346,6 +351,7 @@ func (service *PhoneNotificationService) scheduleExact(
 	if scheduledAt.Before(time.Now().UTC()) {
 		scheduledAt = time.Now().UTC()
 	}
+	scheduledAt = quietResolveCustom(ctx, phone, scheduledAt) // CUSTOM: see quiet_hours_custom.go
 	notification.ScheduledAt = scheduledAt
 
 	if err := service.phoneNotificationRepository.ScheduleExact(ctx, notification); err != nil {

@@ -299,6 +299,12 @@ func (service *HeartbeatService) Monitor(ctx context.Context, params *HeartbeatM
 		return nil
 	}
 
+	// CUSTOM: quiet hours — no probe, no offline alarm. See quiet_hours_custom.go.
+	heartbeat, quiet := quietMonitorCustom(ctx, heartbeat)
+	if quiet {
+		return service.scheduleHeartbeatCheck(ctx, heartbeat.Timestamp, params)
+	}
+
 	// send urgent FCM message if the last heartbeat is late
 	if time.Now().UTC().Sub(heartbeat.Timestamp) > heartbeatCheckInterval && time.Now().UTC().Sub(heartbeat.Timestamp) < (heartbeatCheckInterval*5) {
 		ctxLogger.Info(fmt.Sprintf("sending missed heartbeat notification for userID [%s] and owner [%s] and monitor ID [%s]", params.UserID, params.Owner, params.MonitorID))

@@ -5,6 +5,7 @@ import androidx.work.Worker
 import androidx.work.WorkerParameters
 import com.httpsms.Constants
 import com.httpsms.HttpSmsApiService
+import com.httpsms.QuietHoursCustom
 import com.httpsms.Settings
 import timber.log.Timber
 
@@ -15,6 +16,8 @@ class HeartbeatWorker(appContext: Context, workerParams: WorkerParameters) : Wor
             Timber.w("user is not logged in, stopping processing")
             return Result.failure()
         }
+
+        if (QuietHoursCustom.deferHeartbeat(applicationContext)) return Result.success() // CUSTOM: see QuietHoursCustom.kt
 
         val phoneNumbers = mutableListOf<String>()
         if (Settings.getActiveStatus(applicationContext, Constants.SIM1)) {
@@ -35,6 +38,7 @@ class HeartbeatWorker(appContext: Context, workerParams: WorkerParameters) : Wor
 
             Settings.setHeartbeatTimestampAsync(applicationContext, System.currentTimeMillis())
             Timber.d("Set the heartbeat timestamp")
+            QuietHoursCustom.refresh(applicationContext) // CUSTOM: see QuietHoursCustom.kt
         } catch (exception: Exception) {
             Timber.e(exception, "Failed to send [${phoneNumbers.joinToString()}] heartbeats to server")
             return Result.failure()

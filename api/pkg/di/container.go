@@ -1793,6 +1793,7 @@ func (container *Container) RegisterPhoneRoutes() {
 	container.logger.Debug(fmt.Sprintf("registering %T routes", &handlers.PhoneHandler{}))
 	container.PhoneHandler().RegisterRoutes(container.App(), container.AuthenticatedMiddleware())
 	container.PhoneHandler().RegisterPhoneAPIKeyRoutes(container.App(), container.PhoneAPIKeyMiddleware(), container.AuthenticatedMiddleware())
+	container.registerQuietHoursCustom() // CUSTOM: see container_quiet_hours_custom.go
 }
 
 // RegisterUserRoutes registers routes for the /users prefix

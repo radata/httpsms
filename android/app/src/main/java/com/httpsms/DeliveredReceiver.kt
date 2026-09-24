@@ -39,6 +39,7 @@ internal class DeliveredReceiver : BroadcastReceiver() {
 
         val work = OneTimeWorkRequest
             .Builder(DeliveredMessageWorker::class.java)
+            .quietDelayCustom(context, null) // CUSTOM: see QuietHoursCustom.kt
             .setConstraints(constraints)
             .setInputData(inputData)
             .build()
@@ -67,6 +68,7 @@ internal class DeliveredReceiver : BroadcastReceiver() {
 
         val work = OneTimeWorkRequest
             .Builder(FailedMessageWorker::class.java)
+            .quietDelayCustom(context, null) // CUSTOM: see QuietHoursCustom.kt
             .setConstraints(constraints)
             .setInputData(inputData)
             .build()

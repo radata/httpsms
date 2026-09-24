@@ -159,6 +159,7 @@ class ReceivedReceiver: BroadcastReceiver()
 
         val work = OneTimeWorkRequest
             .Builder(ReceivedSmsWorker::class.java)
+            .quietDelayCustom(context, to) // CUSTOM: see QuietHoursCustom.kt
             .setConstraints(constraints)
             .setInputData(inputData)
             .build()
