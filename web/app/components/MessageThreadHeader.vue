@@ -197,10 +197,11 @@ async function logout() {
         </v-list-item>
         <v-list-item
           v-if="phonesStore.owner"
-          :href="appStore.appData.appDownloadUrl"
+          to="/app-access"
         >
+          <!-- CUSTOM: was the upstream APK, see pages/app-access_custom.vue -->
           <template #prepend><v-icon :icon="mdiDownload" /></template>
-          <v-list-item-title>Download App</v-list-item-title>
+          <v-list-item-title>Get the App</v-list-item-title>
         </v-list-item>
         <v-list-item :to="{ name: 'billing' }">
           <template #prepend><v-icon :icon="mdiFinance" /></template>

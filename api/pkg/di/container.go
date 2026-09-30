@@ -1800,6 +1800,7 @@ func (container *Container) RegisterPhoneRoutes() {
 func (container *Container) RegisterUserRoutes() {
 	container.logger.Debug(fmt.Sprintf("registering %T routes", &handlers.UserHandler{}))
 	container.UserHandler().RegisterRoutes(container.App(), container.AuthenticatedMiddleware())
+	container.registerAppAccessCustom() // CUSTOM: see container_app_access_custom.go
 }
 
 // RegisterMessageSendScheduleRoutes registers routes for the /send-schedules prefix

@@ -475,10 +475,9 @@ const planYearlyMonthlyPrice = computed(
                     <VCardTitle class="text-headline-medium">Step 2</VCardTitle>
                     <VCardText class="text-body-large">
                       <a
-                        download
                         class="font-weight-bold text-decoration-none"
-                        :href="config.public.appDownloadUrl"
-                        >Download</a
+                        href="/app-access"
+                        >Get</a
                       >
                       and install the companion android application on your
                       phone and sign in using your API Key.

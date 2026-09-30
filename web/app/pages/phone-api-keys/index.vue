@@ -18,7 +18,6 @@ useHead({
 const config = useRuntimeConfig()
 const { lgAndUp } = useVDisplay()
 const authStore = useAuthStore()
-const appStore = useAppStore()
 const phonesStore = usePhonesStore()
 const notificationsStore = useNotificationsStore()
 const { formatTimestamp, formatPhoneNumber } = useFilters()
@@ -413,7 +412,7 @@ onBeforeUnmount(() => {
           <a
             class="text-decoration-none hover:text-decoration-underline"
             target="_blank"
-            :href="appStore.appData.appDownloadUrl"
+            href="/app-access"
             >httpSMS app</a
           >
           on your Android phone to login.

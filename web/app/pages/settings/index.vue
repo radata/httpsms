@@ -937,7 +937,7 @@ onMounted(async () => {
                       Scan this QR code with the
                       <a
                         class="text-decoration-none hover:text-decoration-underline"
-                        :href="config.public.appDownloadUrl"
+                        href="/app-access"
                         >httpSMS app</a
                       >
                       on your Android phone to login.

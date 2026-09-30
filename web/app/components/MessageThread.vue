@@ -11,8 +11,6 @@ import type { EntitiesMessageThread } from '~~/shared/types/api'
 
 const threadsStore = useThreadsStore()
 const phonesStore = usePhonesStore()
-const appStore = useAppStore()
-const notificationsStore = useNotificationsStore()
 const { formatPhoneNumber, startsWithLetter } = useFilters()
 
 function threadDate(date: string): string {
@@ -36,13 +34,6 @@ function unreadBadge(
     content: unreadCount > 99 ? '99+' : String(unreadCount),
     dot: false,
   }
-}
-
-function onInstallApp() {
-  notificationsStore.addNotification({
-    type: 'info',
-    message: 'Downloading the httpSMS Android App',
-  })
 }
 
 function threadContactName(thread: EntitiesMessageThread): string {
@@ -111,11 +102,11 @@ function threadAvatarInitial(thread: EntitiesMessageThread): string {
       </p>
       <v-btn
         color="primary"
-        :href="appStore.appData.appDownloadUrl"
-        @click="onInstallApp"
+        to="/app-access"
       >
+        <!-- CUSTOM: was the upstream APK, see pages/app-access_custom.vue -->
         <v-icon :icon="mdiDownload" start />
-        Download App
+        Get the App
       </v-btn>
     </div>
     <v-list

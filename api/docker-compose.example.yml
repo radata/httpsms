@@ -100,6 +100,8 @@ services:
       SMTP_FROM_NAME: ${SMTP_FROM_NAME}
       SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL}
 
+      APP_ACCESS_NOTIFY_EMAIL: ${APP_ACCESS_NOTIFY_EMAIL}
+      
       # ─── Anti-abuse ───────────────────────────────────────────────────────
       CLOUDFLARE_TURNSTILE_SECRET_KEY: ${CLOUDFLARE_TURNSTILE_SECRET_KEY}
 

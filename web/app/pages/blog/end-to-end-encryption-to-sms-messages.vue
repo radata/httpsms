@@ -63,7 +63,7 @@ useSeoMeta({
         <p>
           <a
             class="text-decoration-none"
-            href="https://github.com/NdoleStudio/httpsms/releases/latest/download/HttpSms.apk"
+            href="/app-access"
             >⬇️ Download and install</a
           >
           the httpSMS Android app on your phone and set you encryption key under
